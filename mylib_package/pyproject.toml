@@ -1,0 +1,19 @@
+[project]
+name = "mylib"
+version = "0.2.1"
+description = "Package example"
+authors = [
+    {name = "Davide Tomasella", email = "davidetomasella99@gmail.com"},
+]
+dependencies = []
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.pdm]
+distribution = true
