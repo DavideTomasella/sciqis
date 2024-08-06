@@ -18,3 +18,6 @@
  > - Follow the instruction to add dependences `pdm add dependence_package`
  > - Then within your conda env `pip install -e ".\mylib_package"` to add the package in dev mode: no  need to reinstall after each change
  > - To use it, `from mylib.myclass import MyClass2` so specify the file name with `src` and the class/method name
+
+## L1 numpy and qubit computing
+>Numpy
