@@ -81,19 +81,22 @@ class QState:
     #def __mul__(self, other: tp.Self) -> complex:
     #    return np.dot(np.conj(self._value.T), other._value)
     def ket(self) -> tp.Self:
-        return self._value
+        return np.vstack(self._value)
     
     def bra(self) -> tp.Self:
-        return np.conj(self._value.T)
+        return np.vstack(np.conj(self._value)).T
     
     def proj(self, other: tp.Self) -> complex:
-        return other.bra()*self.ket()
+        return other.bra()@self.ket()
     
     def out(self, other: tp.Self) -> np.ndarray[complex]:
-        return self.ket()*other.bra()
+        return self.ket()@other.bra()
     
     def measure_prob(self, other: tp.Self) -> complex:
         return np.abs(self.proj(other))**2
+    
+    def normalize(self) -> tp.Self:
+        return QState(self._value/np.linalg.norm(self._value))
     
     def __str__(self):
         return str(self._value)
@@ -105,13 +108,13 @@ class QGate:
     __tolerance = 1e-9
     
     @staticmethod
-    def create_gate(args:tp.List[tp.Union[np.ndarray[complex],tp.Self]])->tp.Self:
+    def create_N_gate(args:tp.List[tp.Union[np.ndarray[complex],tp.Self]])->tp.Self:
         if len(args) < 1:
             raise ValueError("At least one gate is required.")
         if isinstance(args[0], QGate):
             #concatenate x.matrix.As of each args
             args = [A for As in (map(lambda x: x.matrix.As, args)) for A in As]
-            
+
         # I need to create diag matrices because the kronecker product is not working with 1D arrays.
         #args=list(map(lambda x: np.diag(x), args))
         #v = np.ones((np.prod([a.shape[1] for a in args]), ))
@@ -131,67 +134,276 @@ class QGate:
             matrix_or_gate = pk.KroneckerProduct([matrix_or_gate])
         self._matrix = matrix_or_gate
         self._dim = len(matrix_or_gate)
+    
+    @staticmethod
+    def _id(dim:int=2):
+        return np.eye(dim)
+    
+    @staticmethod
+    def _n_id(n:int=1,dim:int=2):
+        return [QGate._id()]*n
+    
+    @classmethod
+    def create_id(self, n=1):
+        return QGate.create_N_gate(QGate._n_id(n))
 
-    @classmethod
-    def _id(self, dim:int=2):
-        return self(np.eye(dim))
+    @staticmethod
+    def _0x0():
+        return np.array([[1,0],[0,0]])
     
-    @classmethod
-    def _0x0(self):
-        return self(np.array([[1,0],[0,0]]))
+    @staticmethod
+    def _1x1():
+        return np.array([[0,0],[0,1]])
     
-    @classmethod
-    def _1x1(self):
-        return self(np.array([[0,0],[0,1]]))
+    @staticmethod
+    def _X():
+        return np.array([[0,1],[1,0]])
     
-    @classmethod
-    def _x(self):
-        return self(np.array([[0,1],[1,0]]))
+    @staticmethod
+    def _Y():
+        return np.array([[0,-1j],[1j,0]])
     
-    @classmethod
-    def _y(self):
-        return self(np.array([[0,-1j],[1j,0]]))
+    @staticmethod
+    def _Z():
+        return np.array([[1,0],[0,-1]])
     
-    @classmethod
-    def _z(self):
-        return self(np.array([[1,0],[0,-1]]))
+    @staticmethod
+    def _not():
+        return QGate._X()
     
-    @classmethod
-    def _not(self):
-        return self._x()
-    
-    @classmethod
-    def _hadamard(self):
-        return self(1/np.sqrt(2)*np.array([[1,1],[1,-1]]))
+    @staticmethod
+    def _hadamard():
+        return 1/np.sqrt(2)*np.array([[1,1],[1,-1]])
 
-    @classmethod
-    def _phase(self):
-        return self(np.array([[1,0],[0,1j]]))
+    @staticmethod
+    def _phase(theta:float):
+        return np.array([[1,0],[0,np.exp(1j*theta)]])
     
-    @classmethod
-    def _Rz(self, theta:float):
-        return self(np.array([[np.exp(1j*theta/2),0],[0,np.exp(-1j*theta/2)]]))
+    @staticmethod
+    def _Rz(theta:float):
+        return np.array([[np.exp(-1j*theta/2),0],[0,np.exp(1j*theta/2)]])
         return self(np.array([[1,0],[0,np.exp(1j*theta)]]))
     
-    @classmethod
-    def _Rx(self, theta:float):
-        return self(np.array([[np.cos(theta/2),-1j*np.sin(theta/2)],[-1j*np.sin(theta/2),np.cos(theta/2)]]))
+    @staticmethod
+    def _Rx(theta:float):
+        return np.array([[np.cos(theta/2),-1j*np.sin(theta/2)],[-1j*np.sin(theta/2),np.cos(theta/2)]])
+    
+    @staticmethod
+    def _Ry(theta:float):
+        return np.array([[np.cos(theta/2),-np.sin(theta/2)],[np.sin(theta/2),np.cos(theta/2)]])
     
     @classmethod
-    def _Ry(self, theta:float):
-        return self(np.array([[np.cos(theta/2),-np.sin(theta/2)],[np.sin(theta/2),np.cos(theta/2)]]))
+    def m0x0(self,mode:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+        if len(mode) > n or n<1:
+            raise ValueError("The number of modes must be less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m in mode:
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._0x0()
+        return self.create_N_gate(tmp)
     
     @classmethod
-    def cnot(self,c,q,n=2):
+    def m1x1(self,mode:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+        if len(mode) > n or n<1:
+            raise ValueError("The number of modes must be less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m in mode:
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._1x1()
+        return self.create_N_gate(tmp)
+    
+    @classmethod
+    def X(self,mode:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+        if len(mode) > n or n<1:
+            raise ValueError("The number of modes must be less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m in mode:
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._X()
+        return self.create_N_gate(tmp)
+    
+    @classmethod
+    def Y(self,mode:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+        if len(mode) > n or n<1:
+            raise ValueError("The number of modes must be less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m in mode:
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._Y()
+        return self.create_N_gate(tmp)
+    
+    @classmethod
+    def Z(self,mode:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+        if len(mode) > n or n<1:
+            raise ValueError("The number of modes must be less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m in mode:
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._Z()
+        return self.create_N_gate(tmp)
+
+    @classmethod
+    def hadamard(self, mode:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+        if len(mode) > n or n<1:
+            raise ValueError("The number of modes and thetas must be the same and less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m in mode:
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._hadamard()
+        return self.create_N_gate(tmp)
+    
+    @classmethod
+    def phase(self, mode:tp.Union[int,list[int]]=0,theta:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+            theta = [theta]
+        if len(mode) != len(theta) or len(mode) > n or n<1:
+            raise ValueError("The number of modes and thetas must be the same and less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m,t in zip(mode,theta):
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._phase(t)
+        return self.create_N_gate(tmp)
+    
+    @classmethod
+    def Rz(self,mode:tp.Union[int,list[int]]=0,theta:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+            theta = [theta]
+        if len(mode) != len(theta) or len(mode) > n or n<1:
+            raise ValueError("The number of modes and thetas must be the same and less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m,t in zip(mode,theta):
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._Rz(t)
+        return self.create_N_gate(tmp)
+        
+    @classmethod
+    def Rx(self,mode:tp.Union[int,list[int]]=0,theta:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+            theta = [theta]
+        if len(mode) != len(theta) or len(mode) > n or n<1:
+            raise ValueError("The number of modes and thetas must be the same and less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m,t in zip(mode,theta):
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._Rx(t)
+        return self.create_N_gate(tmp)
+    
+    @classmethod
+    def Ry(self,mode:tp.Union[int,list[int]]=0,theta:tp.Union[int,list[int]]=0,n=1):
+        if type(mode) == int:
+            mode = [mode]
+            theta = [theta]
+        if len(mode) != len(theta) or len(mode) > n or n<1:
+            raise ValueError("The number of modes and thetas must be the same and less than the number of qubits.")
+        tmp = QGate._n_id(n)
+        for m,t in zip(mode,theta):
+            if m>=n or m<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp[m] = QGate._Ry(t)
+        return self.create_N_gate(tmp)
+    
+    
+    @classmethod
+    def cnot(self,c:int,q:int,n=2):
         #build the matrix using the kronecker product of the identity and the x gate
-        #for dim=2 QGate.create_gate([QGate._0(), QGate._id()]) + QGate.create_gate([QGate._1(), QGate._x()])
+        #for dim=2 QGate.create_gate([QGate._0(), QGate._id()]) + QGate.create_gate([QGate._1(), QGate._X()])
         #in general ...
-        tmp_0 = [QGate._id()]*n
+        if n<2 or c>=n or c<0 or q>=n or q<0 or c==q:
+            raise ValueError("CNOT gate requires at least 2 qubits.")
+        tmp_0 = QGate._n_id(n)
         tmp_0[c] = QGate._0x0()
-        tmp_1 = [QGate._id()]*n
+        tmp_1 = QGate._n_id(n)
         tmp_1[c] = QGate._1x1()
-        tmp_1[q] = QGate._x()
-        return self.create_gate(tmp_0) + self.create_gate(tmp_1)
+        tmp_1[q] = QGate._X()
+        return self.create_N_gate(tmp_0) + self.create_N_gate(tmp_1)
+    
+    @classmethod
+    def cz(self,c:int,q:int,n=2):
+        if n<2 or c>=n or c<0 or q>=n or q<0 or c==q:
+            raise ValueError("CZ gate requires at least 2 qubits.")
+        tmp_0 = QGate._n_id(n)
+        tmp_0[c] = QGate._0x0()
+        tmp_1 = QGate._n_id(n)
+        tmp_1[c] = QGate._1x1()
+        tmp_1[q] = QGate._Z()
+        return self.create_N_gate(tmp_0) + self.create_N_gate(tmp_1)
+
+    @classmethod
+    def swap(self,a:int,b:int,n=2):
+        #build the matrix using the kronecker product of the identity and the x gate
+        #for dim=2 QGate.create_gate([QGate._0(), QGate._id()]) + QGate.create_gate([QGate._1(), QGate._X()])
+        #in general ...
+        if n<2 or a>=n or a<0 or b>=n or b<0 or a==b:
+            raise ValueError("Swap gate requires at least 2 qubits.")
+        tmp_0 = QGate._n_id(n)
+        tmp_1 = QGate._n_id(n)
+        tmp_1[a] = QGate._X()
+        tmp_1[b] = QGate._X()
+        tmp_2 = QGate._n_id(n)
+        tmp_2[a] = QGate._Y()
+        tmp_2[b] = QGate._Y()
+        tmp_3 = QGate._n_id(n)
+        tmp_3[a] = QGate._Z()
+        tmp_3[b] = QGate._Z()
+        return 0.5*(self.create_N_gate(tmp_0) + self.create_N_gate(tmp_1)+ self.create_N_gate(tmp_2)+ self.create_N_gate(tmp_3))
+
+    @classmethod
+    def toffoli(self, c1:int, c2:int,q:int, n=3):
+        if n<3 or c1>=n or c1<0 or c2>=n or c2<0 or c1==c2 or c1==q or c2==q:
+            raise ValueError("Toffoli gate requires at least 3 qubits.")
+        tmp_0 = QGate._n_id(n)
+        tmp_0[c1] = QGate._0x0()
+        tmp_0[c2] = QGate._0x0()
+        tmp_1 = QGate._n_id(n)
+        tmp_1[c1] = QGate._0x0()
+        tmp_1[c2] = QGate._1x1()
+        tmp_2 = QGate._n_id(n)
+        tmp_2[c1] = QGate._1x1()
+        tmp_2[c2] = QGate._0x0()
+        tmp_3 = QGate._n_id(n)
+        tmp_3[c1] = QGate._1x1()
+        tmp_3[c2] = QGate._1x1()
+        tmp_3[q] = QGate._X()
+        return self.create_N_gate(tmp_0) + self.create_N_gate(tmp_1) + self.create_N_gate(tmp_2) + self.create_N_gate(tmp_3)
+
+
+    @classmethod
+    def measurement(self, mode:tp.Union[int,list[int]],outcome:tp.Union[int,list[int]],n=1):
+        if type(mode) == int:
+            mode = [mode]
+            theta = [theta]
+        if len(mode) != len(outcome) or len(mode) > n or n<1:
+            raise ValueError("The number of modes and outcomes must be the same and less than the number of qubits.")
+        tmp_0 = QGate._n_id(n)
+        for mm, oo in zip(mode, outcome):
+            if mm>=n or mm<0:
+                raise ValueError("The mode must be a valid qubit.")
+            tmp_0[mm] = QGate._1x1() if oo else QGate._0x0()
+        return self.create_N_gate(tmp_0)
 
     @property
     def dim(self):
@@ -224,7 +436,7 @@ class QGate:
     def __add__(self, other: tp.Self) -> tp.Self:
         return QGate(self._matrix + other._matrix)
         return QGate(pk.KroneckerSum([self._matrix ,other._matrix]))
-
+    
     def __str__(self):
         return str(self._matrix)
     
@@ -279,7 +491,8 @@ class QUGate(QGate):
 # In[]
 if __name__ == "__main__":
 
-    g = QGate.create_gate([QGate._hadamard(),QGate._id(),QGate._id()])
+    g = QGate.create_N_gate([QGate.hadamard(),QGate.create_id(),QGate.create_id()])
+    g = QGate.create_N_gate([QGate._hadamard(),QGate._id(),QGate._id()])
 
     q = QState([1,0,0])
     print(QState._0())
@@ -295,8 +508,8 @@ if __name__ == "__main__":
     print(u)
 
     print(QState._0()%QState._1())
-    print(QUGate._id()%QUGate._id())
-    print(QGate._id()%QGate([[1,0],[0,0.9]]))
+    print(QUGate.create_id()%QUGate.create_id())
+    print(QGate.create_id()%QGate([[1,0],[0,0.9]]))
 
     
     print(QUGate._hadamard() % QUGate._id())
@@ -305,7 +518,7 @@ if __name__ == "__main__":
     state_0000 = QState._0() % QState._0() % QState._0() #% QState._0()
     state_0001 = QState._0() % QState._0() % QState._0() #% QState._1()
     print(state_0000)
-    gate = QUGate._hadamard() % QUGate._hadamard() % QUGate._hadamard() #% QUGate._id()
+    gate = QUGate.hadamard() % QUGate.hadamard() % QUGate.hadamard() #% QUGate._id()
     print(gate)
     state2=gate*state_0000
     print(state2)
@@ -314,8 +527,8 @@ if __name__ == "__main__":
 
 
     state_00 = QState._0() % QState._0()
-    had = QGate._hadamard() % QGate._id()
-    cnot = QUGate(QGate._0x0() % QGate._id() + QGate._1x1() % QGate._x())
+    had = QGate.hadamard() % QGate.create_id()
+    cnot = QUGate(QGate.m0x0() % QGate.create_id() + QGate.m1x1() % QGate.X())
     print(cnot)
     print(had*state_00)
     print(cnot*(had*state_00))
@@ -323,22 +536,29 @@ if __name__ == "__main__":
 
     
     state_00 = QState._0() % QState._0() % QState._0()
-    had = QGate._hadamard() % QGate._id() % QGate._id()
-    cnot = QUGate(QGate._0x0() % QGate._id() % QGate._id() + QGate._1x1() % QGate._id() % QGate._x())
+    had = QGate.hadamard() % QGate.create_id() % QGate.create_id()
+    cnot = QUGate(QGate.m0x0() % QGate.create_id() % QGate.create_id() + QGate.m1x1() % QGate.create_id() % QGate.X())
 
     print(cnot)
     print(had*state_00)
     print(cnot*(had*state_00))
     print(cnot*had*state_00)
 
-    print(QState.create_state([QState._0()]*3))
-    print(QGate.create_gate([QGate._hadamard(),QGate._id(), QGate._id()]))
-    print(QGate.create_gate([QGate._hadamard(),QGate._id()% QGate._id()]))
-    new_state_00 = QState.create_state([QState._0()]*3)
-    new_had = QGate.create_gate([QGate._hadamard(),QGate._id(), QGate._id()])
-    new_cnot = QGate.create_gate([QGate._0x0(), QGate._id(), QGate._id()]) + QGate.create_gate([QGate._1x1(), QGate._id(), QGate._x()])
-    
+    N=3
+    print(QState.create_state([QState._0()]*N))
+    print(QGate.hadamard(0,n=N))
+    new_state_00 = QState.create_state([QState._0()]*N)
+    new_had = QGate.hadamard([0,2],n=N)
+    new_cnot = QGate.cnot(0,1,n=N)
+
     print(new_cnot)
     print(new_had*new_state_00)
     print(new_cnot*(new_had*new_state_00))
     print(new_cnot*new_had*new_state_00)
+
+
+    measure_0 = QGate.measurement([0],[0],n=3)
+    measure_1 = QGate.measurement([0],[1],n=3)
+
+    print((measure_0*new_cnot*new_had*new_state_00).normalize())
+    print((measure_1*new_cnot*new_had*new_state_00).normalize())
