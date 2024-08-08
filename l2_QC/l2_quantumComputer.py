@@ -488,6 +488,9 @@ class QUGate(QGate):
         return super().__add__(other)
         return QUGate(pk.KroneckerSum([self._matrix ,other._matrix]))
     
+
+    # TODO create QGateFactory and QStateFactory to create the gates and states.
+    
 # In[]
 if __name__ == "__main__":
 
