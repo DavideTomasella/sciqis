@@ -21,7 +21,8 @@ def computer2():
     print(s)
 
 if __name__ == '__main__':
-    for i in range(1):
+    for i in range(100):
+        #use austin to run this script and profle the cde
         #austin -i 100 --pipe C:\Users\davtom\AppData\Local\miniforge3\envs\sciqis\python.exe ".\test_l3.py" >test2.austin
         computer2()
         #print(i)

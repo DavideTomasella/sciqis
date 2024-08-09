@@ -26,3 +26,4 @@
 > N_gate2 = QGate.cnot(c=0,q=1,n=N)
 > collapse_state, prob = (N_gate2*N_gate*N_state).collapse_after_measurement()
 > ```
+> More examples can be found in the class file

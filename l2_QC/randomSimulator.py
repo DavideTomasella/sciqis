@@ -5,8 +5,8 @@ from l2_quantumComputer import QState,QGate
 
 if __name__ == "__main__":
     rng_gen=np.random.default_rng()
-    runs=100000
-    N_states=5
+    runs=1000
+    N_states=2
     N_pars=10
     N_tests = 7
     rngs=rng_gen.uniform(0,2*np.pi,size=(runs,N_pars,N_states))
