@@ -94,9 +94,15 @@ class QState:
     
     def measure_prob(self, other: tp.Self) -> complex:
         return np.abs(self.proj(other))**2
-    
+        
     def normalize(self) -> tp.Self:
-        return QState(self._value/np.linalg.norm(self._value))
+        return QState(self._value/self.norm())
+    
+    def norm(self) -> float:
+        return np.linalg.norm(self._value)
+    
+    def collapse_after_measurement(self) -> tp.Self | float:
+        return self.normalize(), self.norm()**2
     
     def __str__(self):
         return str(self._value)
@@ -395,7 +401,7 @@ class QGate:
     def measurement(self, mode:tp.Union[int,list[int]],outcome:tp.Union[int,list[int]],n=1):
         if type(mode) == int:
             mode = [mode]
-            theta = [theta]
+            outcome = [outcome]
         if len(mode) != len(outcome) or len(mode) > n or n<1:
             raise ValueError("The number of modes and outcomes must be the same and less than the number of qubits.")
         tmp_0 = QGate._n_id(n)
@@ -560,8 +566,12 @@ if __name__ == "__main__":
     print(new_cnot*new_had*new_state_00)
 
 
-    measure_0 = QGate.measurement([0],[0],n=3)
-    measure_1 = QGate.measurement([0],[1],n=3)
-
-    print((measure_0*new_cnot*new_had*new_state_00).normalize())
-    print((measure_1*new_cnot*new_had*new_state_00).normalize())
+    measure_0 = QGate.measurement(0,0,n=3)
+    measure_1 = QGate.measurement(0,1,n=3)
+    collapse_0 = measure_0*new_cnot*new_had*new_state_00
+    collapse_1 = measure_1*new_cnot*new_had*new_state_00
+    print(collapse_0)
+    print(collapse_0.collapse_after_measurement())
+    print(collapse_1.collapse_after_measurement())
+    new_state_0, prob_0 = collapse_0.collapse_after_measurement()
+    new_state_1, prob_1 = collapse_1.collapse_after_measurement()
