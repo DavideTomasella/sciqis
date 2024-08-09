@@ -9,8 +9,7 @@
 > ```
 > projection_0 = QGate.measurement(mode=0,outcome=0)
 > projection_1 = QGate.measurement(mode=0,outcome=1)
-> collapse_state = (projection_0*out_state).normalize()
-> collapse_prob0 = out_state.meas_prob(QState._0())
+> collapse_state, collapse_prob0 = (projection_0*out_state).collapse_after_measurement()
 > ```
 > We can create multi-state and multi-gate through an efficient implementation by `pyKronecker`
 > ```
