@@ -1,3 +1,4 @@
+# In[]
 import typing as tp
 import numpy as np
 import h5py
@@ -33,15 +34,16 @@ def res_model(params, P, sq_spec, asq_spec):
     residuals = np.concatenate([sq_spec-model_sq, asq_spec-model_asq])
     return residuals
 
+# In[]
+#file read
+powers=[]#list
+spectra_asq=[]#matrix 10x5000
+spectra_sq=[]
+freqs=None#[]
+vars_asq=calc_noise_var(spectra_asq)
+vars_sq=calc_noise_var(spectra_sq)
+res = least_squares(res_model, [1.5,.8,0.2, 0, 90, 0.1], 
+                bounds=([0,.5,0,-10,80,-10], [20,1,0.4,10,100,10]), 
+                args=[powers, vars_sq, vars_asq])
+print(res)
 
-if __name__=="__main__":
-    powers=[]
-    spectra_asq=[]
-    spectra_sq=[]
-    freqs=None#[]
-    vars_asq=calc_noise_var(spectra_asq)
-    vars_sq=calc_noise_var(spectra_sq)
-    res = least_squares(res_model, [1.5,.8,0.2, 0, 90, 0.1], 
-                    bounds=([0,.5,0,-10,80,0], [20,1,0.4,10,100,10]), 
-                    args=[powers, vars_sq, vars_asq])
-    res
