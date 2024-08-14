@@ -153,7 +153,7 @@ res = least_squares(res_model, [0.8,.7,4e6, 0, 90, 0.1],
                 args=[f_new, ff_sq_dB, ff_asq_dB])
 print(res)
 Pth, eta, bw, theta_sq, theta_asq, sigma = res.x
-plt.plot(f_new, ff_sq_dB)
-plt.plot(f_new, ff_asq_dB)
+plt.plot(f_new, ff_sq_dB,".",markersize=1)
+plt.plot(f_new, ff_asq_dB,".",markersize=1)
 plt.plot(f_new, lin2db(Vrotfluct(1, Pth, eta, f_new/bw, theta_sq, sigma)))
 plt.plot(f_new, lin2db(Vrotfluct(1, Pth, eta, f_new/bw, theta_asq, sigma)))
